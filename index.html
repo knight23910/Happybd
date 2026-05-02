@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Happy Birthday - Interactive 3D Cube</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Poppins', 'Segoe UI', sans-serif;
+        }
+        
+        .ui-overlay {
+            position: fixed;
+            bottom: 25px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            z-index: 100;
+            pointer-events: none;
+        }
+        
+        .cake-button {
+            pointer-events: auto;
+            background: linear-gradient(135deg, #ff9a5e, #ff6b3d);
+            border: none;
+            padding: 14px 32px;
+            margin-bottom: 80px;
+            border-radius: 60px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+            transition: transform 0.2s, box-shadow 0.2s;
+            font-family: inherit;
+            backdrop-filter: blur(4px);
+            background-color: rgba(255,120,60,0.9);
+            border: 1px solid rgba(255,255,200,0.5);
+        }
+        
+        .cake-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 12px 30px rgba(0,0,0,0.4);
+        }
+        
+        .cake-button:active {
+            transform: scale(0.98);
+        }
+        
+        .greeting-text {
+            position: fixed;
+            top: 20px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            color: white;
+            font-size: 1.8rem;
+            font-weight: bold;
+            text-shadow: 0 0 15px rgba(0,0,0,0.5), 2px 2px 4px rgba(0,0,0,0.3);
+            z-index: 100;
+            pointer-events: none;
+            background: linear-gradient(135deg, #FFD89B, #FFB347);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            text-shadow: none;
+            font-weight: 800;
+            letter-spacing: 2px;
+        }
+        
+        .instruction {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(8px);
+            padding: 6px 14px;
+            border-radius: 30px;
+            color: #ffecb3;
+            font-size: 0.75rem;
+            z-index: 100;
+            pointer-events: none;
+            font-family: monospace;
+        }
+        
+        @media (max-width: 700px) {
+            .greeting-text { font-size: 1.2rem; top: 12px; }
+            .cake-button { padding: 10px 24px; font-size: 1rem; }
+        }
+        
+        #confetti-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 200;
+        }
+        
+        .focus-message {
+            position: fixed;
+            bottom: 45%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #ffd966, #ffaa33);
+            color: #b33e00;
+            padding: 12px 28px;
+            border-radius: 60px;
+            font-weight: bold;
+            font-size: 1.6rem;
+            white-space: nowrap;
+            box-shadow: 0 0 30px rgba(255,100,0,0.8);
+            z-index: 300;
+            font-family: inherit;
+            animation: popUp 1.5s ease-out forwards;
+            pointer-events: none;
+            text-shadow: 0 1px 0 rgba(255,255,200,0.8);
+        }
+        
+        @keyframes popUp {
+            0% { opacity: 0; transform: translateX(-50%) scale(0.5); bottom: 45%; }
+            20% { opacity: 1; transform: translateX(-50%) scale(1.1); }
+            80% { opacity: 1; transform: translateX(-50%) scale(1); }
+            100% { opacity: 0; transform: translateX(-50%) scale(1.2); bottom: 55%; visibility: hidden; }
+        }
+    </style>
+</head>
+<body>
+    <div class="greeting-text">🎂 HAPPY BIRTHDAY! 🎈</div>
+    <div class="ui-overlay">
+        <button id="cutCakeBtn" class="cake-button">🎂 CUT THE CAKE & CELEBRATE! 🎉</button>
+    </div>
+    <div class="instruction">✨ Drag to rotate the cube | Inside view | Auto-rotate when idle ✨</div>
+    <canvas id="confetti-canvas"></canvas>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.128.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.128.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+        // --- setup scene, camera inside the cube ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x050b1a);
+        
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 0, 0.1);
+        camera.lookAt(0, 0, 1);
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        document.body.appendChild(renderer.domElement);
+        
+        const labelRenderer = new CSS2DRenderer();
+        labelRenderer.setSize(window.innerWidth, window.innerHeight);
+        labelRenderer.domElement.style.position = 'absolute';
+        labelRenderer.domElement.style.top = '0px';
+        labelRenderer.domElement.style.left = '0px';
+        labelRenderer.domElement.style.pointerEvents = 'none';
+        document.body.appendChild(labelRenderer.domElement);
+        
+        // --- Controls
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableZoom = false;
+        controls.enablePan = false;
+        controls.rotateSpeed = 1.2;
+        controls.target.set(0, 0, 0);
+        controls.update();
+        
+        // --- AUTO-ROTATION LOGIC (unchanged)
+        let idleTimer = null;
+        
+        function startIdleTimer() {
+            if (idleTimer) clearTimeout(idleTimer);
+            idleTimer = setTimeout(() => {
+                if (!controls.autoRotate) {
+                    controls.autoRotate = true;
+                }
+            }, 2000);
+        }
+        
+        function onUserInteraction() {
+            if (controls.autoRotate) {
+                controls.autoRotate = false;
+            }
+            startIdleTimer();
+        }
+        
+        controls.addEventListener('start', onUserInteraction);
+        renderer.domElement.addEventListener('mousedown', onUserInteraction);
+        renderer.domElement.addEventListener('touchstart', onUserInteraction);
+        
+        controls.autoRotate = false;
+        controls.autoRotateSpeed = 1.5;
+        startIdleTimer();
+        
+        // --- Lighting (enhanced slightly for better cake visuals but structure intact)
+        const ambientLight = new THREE.AmbientLight(0x404060);
+        scene.add(ambientLight);
+        const pointLight = new THREE.PointLight(0xffaa66, 1.2, 15);
+        pointLight.position.set(2, 3, 2);
+        scene.add(pointLight);
+        const backLight = new THREE.PointLight(0xff8866, 0.6);
+        backLight.position.set(-2, 1, -3);
+        scene.add(backLight);
+        const fillLight = new THREE.DirectionalLight(0xffccaa, 0.8);
+        fillLight.position.set(1, 2, 1);
+        scene.add(fillLight);
+        
+        // --- Create the INNER CUBE (exactly as original)
+        const imageUrls = [
+            "2.jpg",   // Front (+Z)
+            "3.jpg",   // Back (-Z)
+            "https://images-static.nykaa.com/media/catalog/product/2/a/2a88f2335J60A77RP_1.jpg?tr=w-500",   // top
+            "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRlbwBFEZIKnZTnrUstLWjy0aFuTvmpSslVWqGNHOtgO6HVbJtmjpvJBto&s=10",   // bottom
+            "4.jpg",   // Up (+Y)
+            "1.jpg"    // front
+        ];
+        
+        const textureLoader = new THREE.TextureLoader();
+        
+        function createWallMaterial(url) {
+            const texture = textureLoader.load(url);
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.RepeatWrapping;
+            texture.minFilter = THREE.LinearFilter;
+            return new THREE.MeshStandardMaterial({
+                map: texture,
+                side: THREE.BackSide,
+                roughness: 0.3,
+                metalness: 0.05,
+                emissive: 0x221100,
+                emissiveIntensity: 0.15
+            });
+        }
+        
+        const cubeMaterials = imageUrls.map(url => createWallMaterial(url));
+        const cubeGeometry = new THREE.BoxGeometry(8, 8, 8);
+        const innerCube = new THREE.Mesh(cubeGeometry, cubeMaterials);
+        scene.add(innerCube);
+        
+        // --- ORIGINAL CAKE MODEL (restored exactly)
+        const cakeGroup = new THREE.Group();
+        
+        const layer1 = new THREE.Mesh(
+            new THREE.CylinderGeometry(1.2, 1.2, 0.5, 32),
+            new THREE.MeshStandardMaterial({ color: 0xffaa77, roughness: 0.3, metalness: 0.1, emissive: 0x552200, emissiveIntensity: 0.1 })
+        );
+        layer1.position.y = -3.0;
+        cakeGroup.add(layer1);
+        
+        const layer2 = new THREE.Mesh(
+            new THREE.CylinderGeometry(1.0, 1.0, 0.5, 32),
+            new THREE.MeshStandardMaterial({ color: 0xffcc99, roughness: 0.2 })
+        );
+        layer2.position.y = -2.55;
+        cakeGroup.add(layer2);
+        
+        const layer3 = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.85, 0.85, 0.45, 32),
+            new THREE.MeshStandardMaterial({ color: 0xffddbb, roughness: 0.2 })
+        );
+        layer3.position.y = -2.1;
+        cakeGroup.add(layer3);
+        
+        const frosting = new THREE.Mesh(
+            new THREE.CylinderGeometry(1.05, 1.1, 0.2, 32),
+            new THREE.MeshStandardMaterial({ color: 0xfff0cc, emissive: 0xffaa66, emissiveIntensity: 0.2 })
+        );
+        frosting.position.y = -2.55;
+        cakeGroup.add(frosting);
+        
+        const candleMatWhite = new THREE.MeshStandardMaterial({ color: 0xffdd99 });
+        const addCandle = (x, z) => {
+            const candleBody = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.5, 8), candleMatWhite);
+            candleBody.position.set(x, -1.85, z);
+            cakeGroup.add(candleBody);
+            const flame = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), new THREE.MeshStandardMaterial({ color: 0xff6600, emissive: 0xff4400, emissiveIntensity: 0.8 }));
+            flame.position.set(x, -1.62, z);
+            cakeGroup.add(flame);
+        };
+        
+        addCandle(0.6, 0.6);
+        addCandle(-0.6, 0.6);
+        addCandle(0, -0.7);
+        addCandle(-0.65, -0.5);
+        addCandle(0.7, -0.5);
+        
+        const cakeDiv = document.createElement('div');
+        cakeDiv.textContent = '🎂 HAPPY BIRTHDAY! 🎂';
+        cakeDiv.style.color = '#ffefc0';
+        cakeDiv.style.fontSize = '26px';
+        cakeDiv.style.fontWeight = 'bold';
+        cakeDiv.style.textShadow = '2px 2px 8px #b33e00';
+        cakeDiv.style.background = 'rgba(0,0,0,0.5)';
+        cakeDiv.style.padding = '8px 20px';
+        cakeDiv.style.borderRadius = '50px';
+        cakeDiv.style.backdropFilter = 'blur(8px)';
+        cakeDiv.style.fontFamily = 'inherit';
+        cakeDiv.style.whiteSpace = 'nowrap';
+        const cakeLabel = new CSS2DObject(cakeDiv);
+        cakeLabel.position.set(0, -1.2, 0);
+        cakeGroup.add(cakeLabel);
+        
+        scene.add(cakeGroup);
+        
+        // --- Floating particles (unchanged)
+        const particleCount = 500;
+        const particleGeometry = new THREE.BufferGeometry();
+        const particlePositions = new Float32Array(particleCount * 3);
+        for (let i = 0; i < particleCount; i++) {
+            particlePositions[i*3] = (Math.random() - 0.5) * 14;
+            particlePositions[i*3+1] = (Math.random() - 0.5) * 7 + 0.5;
+            particlePositions[i*3+2] = (Math.random() - 0.5) * 14;
+        }
+        particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
+        const particleMaterial = new THREE.PointsMaterial({ color: 0xffaa66, size: 0.08, transparent: true, opacity: 0.6 });
+        const particles = new THREE.Points(particleGeometry, particleMaterial);
+        scene.add(particles);
+        
+        // --- Music (unchanged)
+        const SONG_URL = "happy birthday.mp3";
+        let audio = null;
+        let isAudioPlaying = false;
+        
+        function initAudio() {
+            if (!audio) {
+                audio = new Audio(SONG_URL);
+                audio.loop = false;
+                audio.volume = 0.65;
+                audio.preload = 'auto';
+            }
+        }
+        
+        function startMusic() {
+            initAudio();
+            audio.play().then(() => { isAudioPlaying = true; }).catch(e => console.log("Autoplay blocked"));
+        }
+        
+        window.addEventListener('load', () => { initAudio(); startMusic(); });
+        document.body.addEventListener('click', () => {
+            if (audio && audio.paused && !isAudioPlaying) { audio.play().catch(e => {}); isAudioPlaying = true; }
+            else if (!audio) { initAudio(); audio.play().catch(e => {}); isAudioPlaying = true; }
+        }, { once: false });
+        
+        // --- Confetti System (enhanced but same trigger)
+        const canvasConfetti = document.getElementById('confetti-canvas');
+        let confCtx = canvasConfetti.getContext('2d');
+        let confettiActive = false;
+        let confParticles = [];
+        
+        function resizeConfetti() {
+            canvasConfetti.width = window.innerWidth;
+            canvasConfetti.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeConfetti);
+        resizeConfetti();
+        
+        function createConfettiBurst() {
+            const count = 220;
+            confParticles = [];
+            for (let i = 0; i < count; i++) {
+                confParticles.push({
+                    x: canvasConfetti.width / 2,
+                    y: canvasConfetti.height / 2,
+                    vx: (Math.random() - 0.5) * 14,
+                    vy: (Math.random() - 0.8) * -15 - 3,
+                    size: Math.random() * 10 + 5,
+                    color: `hsl(${Math.random() * 360}, 85%, 60%)`,
+                    life: 1,
+                    gravity: 0.2,
+                    spin: (Math.random() - 0.5) * 0.25,
+                    rotation: Math.random() * 360
+                });
+            }
+            if (confettiActive) cancelAnimationFrame(confettiActive);
+            function animateConfettiFrame() {
+                if (confParticles.length === 0) {
+                    cancelAnimationFrame(confettiActive);
+                    confettiActive = null;
+                    confCtx.clearRect(0, 0, canvasConfetti.width, canvasConfetti.height);
+                    return;
+                }
+                confCtx.clearRect(0, 0, canvasConfetti.width, canvasConfetti.height);
+                for (let i = 0; i < confParticles.length; i++) {
+                    const p = confParticles[i];
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.vy += p.gravity;
+                    p.rotation += p.spin;
+                    p.life -= 0.007;
+                    if (p.y > canvasConfetti.height + 60 || p.x < -50 || p.x > canvasConfetti.width + 50 || p.life <= 0) {
+                        confParticles.splice(i, 1);
+                        i--;
+                        continue;
+                    }
+                    confCtx.save();
+                    confCtx.translate(p.x, p.y);
+                    confCtx.rotate(p.rotation * Math.PI / 180);
+                    confCtx.fillStyle = p.color;
+                    confCtx.fillRect(-p.size/2, -p.size/2, p.size, p.size);
+                    confCtx.restore();
+                }
+                confettiActive = requestAnimationFrame(animateConfettiFrame);
+            }
+            animateConfettiFrame();
+            setTimeout(() => {
+                if (confettiActive) cancelAnimationFrame(confettiActive);
+                confCtx.clearRect(0, 0, canvasConfetti.width, canvasConfetti.height);
+            }, 2800);
+        }
+        
+        // --- NEW: Auto Camera Focus on Cake (Smooth transition) + Enhanced Celebration
+        let isFocusing = false;
+        let focusAnimFrame = null;
+        
+        function focusOnCakeAndCelebrate() {
+            if (isFocusing) return;
+            isFocusing = true;
+            
+            // Disable auto-rotate temporarily
+            controls.autoRotate = false;
+            if (idleTimer) clearTimeout(idleTimer);
+            
+            // Store original camera position and target
+            const startPos = camera.position.clone();
+            const startTarget = controls.target.clone();
+            // Target position: closer to the cake (x:0, y: slightly above center, z: closer)
+            const targetPos = new THREE.Vector3(0, -1.2, 1.8);
+            const targetLook = new THREE.Vector3(0, -1.5, 0);
+            const duration = 800;
+            const startTime = performance.now();
+            
+            function animateFocus(now) {
+                const elapsed = now - startTime;
+                let t = Math.min(1, elapsed / duration);
+                const easeOut = 1 - Math.pow(1 - t, 3);
+                camera.position.lerpVectors(startPos, targetPos, easeOut);
+                controls.target.lerpVectors(startTarget, targetLook, easeOut);
+                controls.update();
+                
+                if (t < 1) {
+                    focusAnimFrame = requestAnimationFrame(animateFocus);
+                } else {
+                    // Focus complete - trigger all celebration effects!
+                    camera.position.copy(targetPos);
+                    controls.target.copy(targetLook);
+                    controls.update();
+                    
+                    // Cake "cut" animation (scale pop and emissive flash)
+                    cakeGroup.children.forEach(child => {
+                        if (child.isMesh && child.material) {
+                            if (child.material.emissiveIntensity !== undefined) {
+                                child.material.emissiveIntensity = 0.7;
+                                setTimeout(() => { if(child.material) child.material.emissiveIntensity = 0.1; }, 350);
+                            }
+                        }
+                    });
+                    
+                    cakeGroup.scale.set(1.1, 1.1, 1.1);
+                    setTimeout(() => { cakeGroup.scale.set(1, 1, 1); }, 250);
+                    
+                    // Enhanced confetti burst
+                    createConfettiBurst();
+                    
+                    // Play "ding" celebration sound
+                    try {
+                        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+                        osc.connect(gain);
+                        gain.connect(audioCtx.destination);
+                        osc.frequency.value = 1200;
+                        gain.gain.value = 0.15;
+                        osc.start();
+                        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.4);
+                        osc.stop(audioCtx.currentTime + 0.4);
+                        audioCtx.resume();
+                    } catch(e) {}
+                    
+                    // Show floating celebration message
+                    const msgDiv = document.createElement('div');
+                    msgDiv.className = 'focus-message';
+                    msgDiv.textContent = '🎉✨ HAPPY BIRTHDAY! ✨🎂';
+                    document.body.appendChild(msgDiv);
+                    setTimeout(() => msgDiv.remove(), 1800);
+                    
+                    isFocusing = false;
+                    focusAnimFrame = null;
+                    // Restart idle timer for auto-rotation
+                    startIdleTimer();
+                }
+            }
+            
+            if (focusAnimFrame) cancelAnimationFrame(focusAnimFrame);
+            focusAnimFrame = requestAnimationFrame(animateFocus);
+        }
+        
+        // Attach to button - CUT THE CAKE triggers focus + celebration
+        const cakeBtn = document.getElementById('cutCakeBtn');
+        cakeBtn.addEventListener('click', focusOnCakeAndCelebrate);
+        
+        // --- candle flicker & particle animation (original)
+        let time = 0;
+        function animateParticles() {
+            particles.rotation.y += 0.002;
+            particles.rotation.x += 0.001;
+            requestAnimationFrame(animateParticles);
+        }
+        animateParticles();
+        
+        function animateCandles() {
+            requestAnimationFrame(animateCandles);
+            time += 0.03;
+            cakeGroup.children.forEach(child => {
+                if (child.isMesh && child.material && child.material.emissiveIntensity && child.geometry.type === 'SphereGeometry') {
+                    const intensity = 0.6 + Math.sin(time * 15) * 0.3;
+                    child.material.emissiveIntensity = intensity;
+                }
+            });
+        }
+        animateCandles();
+        
+        // --- Main animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+            labelRenderer.render(scene, camera);
+        }
+        animate();
+        
+        // Sparkle effect around cake (small enhancement but keeps original look)
+        const sparkleGeo = new THREE.BufferGeometry();
+        const sparkCount = 200;
+        const sparkPos = [];
+        for (let i = 0; i < sparkCount; i++) {
+            sparkPos.push((Math.random() - 0.5) * 3, (Math.random() - 0.5) * 3 + -1, (Math.random() - 0.5) * 3);
+        }
+        sparkleGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(sparkPos), 3));
+        const sparkMat = new THREE.PointsMaterial({ color: 0xffaa55, size: 0.04, transparent: true });
+        const sparkles = new THREE.Points(sparkleGeo, sparkMat);
+        sparkles.position.set(0, -1.2, 0);
+        cakeGroup.add(sparkles);
+        
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            labelRenderer.setSize(window.innerWidth, window.innerHeight);
+            resizeConfetti();
+        });
+        
+        setTimeout(() => {
+            if (audio && audio.paused) audio.play().catch(e => {});
+        }, 1000);
+        
+        console.log("%c🎵 Original cake position restored | Click 'Cut the Cake' to auto-focus and celebrate! 🎵", "color: orange; font-size: 16px");
+    </script>
+</body>
+</html>
