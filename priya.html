@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title> - Interactive 3D Cube</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Poppins', 'Segoe UI', sans-serif;
+        }
+        
+        /* Removed .ui-overlay and .cake-button styles since button is removed */
+        
+        .greeting-text {
+            position: fixed;
+            top: 20px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            color: white;
+            font-size: 1.8rem;
+            font-weight: bold;
+            text-shadow: 0 0 15px rgba(0,0,0,0.5), 2px 2px 4px rgba(0,0,0,0.3);
+            z-index: 100;
+            pointer-events: none;
+            background: linear-gradient(135deg, #FFD89B, #FFB347);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            text-shadow: none;
+            font-weight: 800;
+            letter-spacing: 2px;
+        }
+        
+        .instruction {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(8px);
+            padding: 6px 14px;
+            border-radius: 30px;
+            color: #ffecb3;
+            font-size: 0.75rem;
+            z-index: 100;
+            pointer-events: none;
+            font-family: monospace;
+        }
+        
+        @media (max-width: 700px) {
+            .greeting-text { font-size: 1.2rem; top: 12px; }
+        }
+        
+        /* Confetti canvas completely removed - no celebration effects */
+        
+        /* Focus message styles removed - no celebration animations */
+    </style>
+</head>
+<body>
+    <div class="greeting-text">🎈for you🎈</div>
+    <!-- Celebration button completely removed -->
+    <div class="instruction">✨ Drag to rotate the cube | Inside view | Auto-rotate when idle ✨</div>
+    <!-- Confetti canvas element removed -->
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.128.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.128.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+        // --- setup scene, camera inside the cube ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x050b1a);
+        
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 0, 0.1);
+        camera.lookAt(0, 0, 1);
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        document.body.appendChild(renderer.domElement);
+        
+        const labelRenderer = new CSS2DRenderer();
+        labelRenderer.setSize(window.innerWidth, window.innerHeight);
+        labelRenderer.domElement.style.position = 'absolute';
+        labelRenderer.domElement.style.top = '0px';
+        labelRenderer.domElement.style.left = '0px';
+        labelRenderer.domElement.style.pointerEvents = 'none';
+        document.body.appendChild(labelRenderer.domElement);
+        
+        // --- Controls
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableZoom = false;
+        controls.enablePan = false;
+        controls.rotateSpeed = 1.2;
+        controls.target.set(0, 0, 0);
+        controls.update();
+        
+        // --- AUTO-ROTATION LOGIC
+        let idleTimer = null;
+        
+        function startIdleTimer() {
+            if (idleTimer) clearTimeout(idleTimer);
+            idleTimer = setTimeout(() => {
+                if (!controls.autoRotate) {
+                    controls.autoRotate = true;
+                }
+            }, 2000);
+        }
+        
+        function onUserInteraction() {
+            if (controls.autoRotate) {
+                controls.autoRotate = false;
+            }
+            startIdleTimer();
+        }
+        
+        controls.addEventListener('start', onUserInteraction);
+        renderer.domElement.addEventListener('mousedown', onUserInteraction);
+        renderer.domElement.addEventListener('touchstart', onUserInteraction);
+        
+        controls.autoRotate = false;
+        controls.autoRotateSpeed = 1.5;
+        startIdleTimer();
+        
+        // --- Lighting (enhanced slightly for better visuals)
+        const ambientLight = new THREE.AmbientLight(0x404060);
+        scene.add(ambientLight);
+        const pointLight = new THREE.PointLight(0xffaa66, 1.2, 15);
+        pointLight.position.set(2, 3, 2);
+        scene.add(pointLight);
+        const backLight = new THREE.PointLight(0xff8866, 0.6);
+        backLight.position.set(-2, 1, -3);
+        scene.add(backLight);
+        const fillLight = new THREE.DirectionalLight(0xffccaa, 0.8);
+        fillLight.position.set(1, 2, 1);
+        scene.add(fillLight);
+        
+        // --- Create the INNER CUBE (exactly as original)
+        const imageUrls = [
+            "2.jpg",   // Front (+Z)
+            "3.jpg",   // Back (-Z)
+            "https://images-static.nykaa.com/media/catalog/product/2/a/2a88f2335J60A77RP_1.jpg?tr=w-500",   // top
+            "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRlbwBFEZIKnZTnrUstLWjy0aFuTvmpSslVWqGNHOtgO6HVbJtmjpvJBto&s=10",   // bottom
+            "4.jpg",   // Up (+Y)
+            "1.jpg"    // front
+        ];
+        
+        const textureLoader = new THREE.TextureLoader();
+        
+        function createWallMaterial(url) {
+            const texture = textureLoader.load(url);
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.RepeatWrapping;
+            texture.minFilter = THREE.LinearFilter;
+            return new THREE.MeshStandardMaterial({
+                map: texture,
+                side: THREE.BackSide,
+                roughness: 0.3,
+                metalness: 0.05,
+                emissive: 0x221100,
+                emissiveIntensity: 0.15
+            });
+        }
+        
+        const cubeMaterials = imageUrls.map(url => createWallMaterial(url));
+        const cubeGeometry = new THREE.BoxGeometry(8, 8, 8);
+        const innerCube = new THREE.Mesh(cubeGeometry, cubeMaterials);
+        scene.add(innerCube);
+        
+        // --- CAKE MODEL AND ALL RELATED ANIMATIONS REMOVED ---
+        // No cakeGroup, no candles, no sparkles around cake, no CSS2D cake label.
+        
+        // --- Floating particles (unchanged)
+        const particleCount = 500;
+        const particleGeometry = new THREE.BufferGeometry();
+        const particlePositions = new Float32Array(particleCount * 3);
+        for (let i = 0; i < particleCount; i++) {
+            particlePositions[i*3] = (Math.random() - 0.5) * 14;
+            particlePositions[i*3+1] = (Math.random() - 0.5) * 7 + 0.5;
+            particlePositions[i*3+2] = (Math.random() - 0.5) * 14;
+        }
+        particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
+        const particleMaterial = new THREE.PointsMaterial({ color: 0xffaa66, size: 0.08, transparent: true, opacity: 0.6 });
+        const particles = new THREE.Points(particleGeometry, particleMaterial);
+        scene.add(particles);
+        
+        // --- Music (unchanged)
+        const SONG_URL = "happy birthday.mp3";
+        let audio = null;
+        let isAudioPlaying = false;
+        
+        function initAudio() {
+            if (!audio) {
+                audio = new Audio(SONG_URL);
+                audio.loop = false;
+                audio.volume = 0.65;
+                audio.preload = 'auto';
+            }
+        }
+        
+        function startMusic() {
+            initAudio();
+            audio.play().then(() => { isAudioPlaying = true; }).catch(e => console.log("Autoplay blocked"));
+        }
+        
+        window.addEventListener('load', () => { initAudio(); startMusic(); });
+        document.body.addEventListener('click', () => {
+            if (audio && audio.paused && !isAudioPlaying) { audio.play().catch(e => {}); isAudioPlaying = true; }
+            else if (!audio) { initAudio(); audio.play().catch(e => {}); isAudioPlaying = true; }
+        }, { once: false });
+        
+        // --- ALL CELEBRATION / CONFETTI / FOCUS ANIMATIONS COMPLETELY REMOVED ---
+        // No confetti canvas, no focus functions, no button event listeners.
+        
+        // --- particle animation (unchanged)
+        function animateParticles() {
+            particles.rotation.y += 0.002;
+            particles.rotation.x += 0.001;
+            requestAnimationFrame(animateParticles);
+        }
+        animateParticles();
+        
+        // --- No candle flicker animation needed (cake removed)
+        
+        // --- Main animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+            labelRenderer.render(scene, camera);
+        }
+        animate();
+        
+        // --- Optional: Subtle ambient glow particles at center (purely aesthetic, no celebration)
+        const centerGlowGeo = new THREE.BufferGeometry();
+        const glowCount = 200;
+        const glowPositions = [];
+        for (let i = 0; i < glowCount; i++) {
+            // Create a sphere of points around center (0,0,0) within radius 1.5
+            const radius = 1.2;
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos(2 * Math.random() - 1);
+            const x = radius * Math.sin(phi) * Math.cos(theta);
+            const y = radius * Math.sin(phi) * Math.sin(theta);
+            const z = radius * Math.cos(phi);
+            glowPositions.push(x, y, z);
+        }
+        centerGlowGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(glowPositions), 3));
+        const glowMat = new THREE.PointsMaterial({ color: 0xffaa77, size: 0.05, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending });
+        const centerGlow = new THREE.Points(centerGlowGeo, glowMat);
+        scene.add(centerGlow);
+        
+        // gentle rotation for glow particles
+        function animateCenterGlow() {
+            requestAnimationFrame(animateCenterGlow);
+            centerGlow.rotation.y += 0.005;
+            centerGlow.rotation.x += 0.003;
+        }
+        animateCenterGlow();
+        
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            labelRenderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        setTimeout(() => {
+            if (audio && audio.paused) audio.play().catch(e => {});
+        }, 1000);
+        
+        console.log("%c🎵 Cake and celebration elements removed | Pure 3D cube experience with ambient particles and music 🎵", "color: orange; font-size: 16px");
+    </script>
+</body>
+</html>
